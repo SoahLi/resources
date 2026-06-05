@@ -1,0 +1,55 @@
+.TH APACTION 3 
+.SH NAME
+apregister, apunregister \- assign an anticipation point handler to an instruction address
+.SH SYNOPSIS
+.nf
+#include <ap.h>
+
+int apregister(uintptr_t \fIaptrig\fP, struct apaction *\fIap\fP);
+int apunregister(uintptr_t \fIaptrig\fP, aphandler_t \fIaptar\fP);
+.fi
+.SH DESCRIPTION
+The \fBapregister\fR() and \fBapunregister\fR()
+functions allow the caller to register and unregister anticipation point handlers
+to specific instruction addresses.
+The argument \fIaptrig\fR specifies the instruction address that will be preempted
+by the anticipation point handler.
+.P
+The structure
+.BR apaction ,
+used to describe an action to be taken, is defined in the
+.I <ap.h>
+header to include the following members:
+.TS
+center box tab(!);
+cB | cB | cB
+lw(1.5i)B | lw(1.25i)I | lw(2.5i).
+Member Type!Member Name!Description
+_
+void(*) (int)!ap_handler!T{
+Pointer to an anticipation point handler function. 
+T}
+int!active!T{
+A read/write bit that enables or disables the selected anticipation point.
+T}
+int!APS!T{
+Anticipation Point Semaphore \(en bypasses anticipation point \fIn\fP times.
+T}
+.TE
+.P
+Registering the same AP handler to the same instruction address multiple times
+is equivalent to replacing the already assigned AP handler with the new one.
+.P
+Multiple anticipation point handlers can be registered to the same instruction
+address, and the order in which they are executed when triggered is non-deterministic.
+.P
+\fBNote:\fR
+It is the programmer's responsibility to keep track of which APs are assigned
+to which instruction address.
+.SH RETURN VALUE
+On success,
+\fBapregister\fR()
+and
+\fBapunregister\fR()
+return 0.
+On error, \-1 is returned 
