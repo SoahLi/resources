@@ -1,12 +1,80 @@
 .TH APACTION 3
 .SH NAME
-sigregister \- assign a anticipation point handler to an instruction address
+sigregister, sigunregister \- assign a anticipation point handler to an instruction address
 .SH SYNOPSIS
-.B corrupt
-[\fB\-n\fR \fIBITS\fR]
-[\fB\-\-bits\fR \fIBITS\fR]
+.B #include <ap.h>
+.PP
+.BI "int APregister(uintptr_t " APaddr ", const struct APaction *" action ");"
+.PP
+.BI "int APunregister(uintptr_t " APaddr ", const struct APaction *" action ");"
 .IR file ...
 .SH DESCRIPTION
+The system defines a set of Anticipation Points (APs) that may be bound to specific RISC-V instruction addresses and triggered at runtime.
+AP delivery resembles the occurrence of a hardware interrupt: the current process context is saved, any APs specified in the handler's
+.I mask
+are blocked from triggering, and the handler is invoked.
+A process may specify a handler to which an AP is delivered, or specify that an AP is to be ignored.
+Multiple handlers may be bound to the same instruction address; each handler is appended to an ordered list and invoked in that order when the AP triggers.
+AP handlers normally execute with other APs blocked according to the mask specified in the
+.B APaction
+structure.
+The mask for a given handler is initialized at registration time via
+.BR APregister ().
+.PP
+The
+.BR APregister ()
+function assigns a handler for the instruction at address
+.IR APaddr .
+If
+.I action
+is non-null, it specifies a handler routine and mask to be associated with that address.
+Multiple calls to
+.BR APregister ()
+with the same
+.I APaddr
+append each new handler to the execution list for that address; no previously registered handler is overwritten.
+The caller must retain the pointer to
+.I action
+if it intends to unregister the handler at a later point.
+.PP
+The
+.BR APunregister ()
+function removes the handler specified by
+.I action
+from the execution list associated with
+.IR APaddr .
+The
+.I action
+pointer must be the same pointer passed to the corresponding
+.BR APregister ()
+call.
+If no matching handler is found for the given address, the call fails and returns \-1.
+.PP
+The
+.B APaction
+structure is used by
+.BR APregister ()
+to specify the handler and associated options for a given instruction address.
+It contains the following members:
+.TP
+.B APhandler_t handler
+Specifies the action to take when the AP triggers.
+The value may be
+.B AP_IGN
+to ignore the AP, or a pointer to a user-defined handler function.
+.TP
+.B APset_t mask
+Specifies a set of APs to block for the duration of the handler's execution.
+Note that APs are not automatically blocked during handler execution unless explicitly included in
+.IR mask .
+.TP
+.B int flags
+A bitmask of flags controlling handler behavior.
+The following flags are defined:
+.RS
+.TP
+.B AP_RESTART
+If this bit is set, any interrupted operation
 .B corrupt
 modifies files by toggling a randomly chosen bit.
 .SH OPTIONS
@@ -14,3 +82,13 @@ modifies files by toggling a randomly chosen bit.
 .BR \-n ", " \-\-bits =\fIBITS\fR
 Set the number of bits to modify.
 Default is one bit.
+
+
+.SH RETURN VALUES
+The
+.BR APregister ()
+and
+.BR APunregister ()
+functions return the value 0 if successful; otherwise the value \-1 is returned and the global variable
+.I errno
+is set to indicate the error.
