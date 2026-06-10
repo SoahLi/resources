@@ -1,55 +1,75 @@
 .TH APACTION 3 
 .SH NAME
-apregister, apunregister \- assign an anticipation point handler to an instruction address
+ap_reg, ap_ureg \- register and unregister anticipation point entries
 .SH SYNOPSIS
 .nf
+#include <stdint.h>
 #include <ap.h>
 
-int apregister(uintptr_t \fIaptrig\fP, struct apaction *\fIap\fP);
-int apunregister(uintptr_t \fIaptrig\fP, aphandler_t \fIaptar\fP);
+
+int ap_reg(uintptr_t \fIap_addr\fP, void(*) (uint8_t) *\fIap_handler\fP, uint8_t \fIap_flags\fP);
+int ap_ureg(uintptr_t \fIap_addr\fP, void(*) (uint8_t) *\fIap_handler\fP);
+int ap_sret(uintptr_t \fIr_addr\fP);
+
 .fi
 .SH DESCRIPTION
-The \fBapregister\fR() and \fBapunregister\fR()
-functions allow the caller to register and unregister anticipation point handlers
-to specific instruction addresses.
-The argument \fIaptrig\fR specifies the instruction address that will be preempted
-by the anticipation point handler.
-.P
-The structure
-.BR apaction ,
-used to describe an action to be taken, is defined in the
-.I <ap.h>
-header to include the following members:
-.TS
-center box tab(!);
-cB | cB | cB
-lw(1.5i)B | lw(1.25i)I | lw(2.5i).
-Member Type!Member Name!Description
-_
-void(*) (int)!ap_handler!T{
-Pointer to an anticipation point handler function. 
-T}
-int!active!T{
-A read/write bit that enables or disables the selected anticipation point.
-T}
-int!APS!T{
-Anticipation Point Semaphore \(en bypasses anticipation point \fIn\fP times.
-T}
-.TE
-.P
-Registering the same AP handler to the same instruction address multiple times
-is equivalent to replacing the already assigned AP handler with the new one.
-.P
-Multiple anticipation point handlers can be registered to the same instruction
-address, and the order in which they are executed when triggered is non-deterministic.
-.P
-\fBNote:\fR
-It is the programmer's responsibility to keep track of which APs are assigned
-to which instruction address.
+The \fBap_reg\fR() and \fBap_ureg\fR() functions allow the caller to
+register and unregister anticipation point handlers to specific
+instruction addresses. The argument \fIap_addr\fR specifies the
+instruction address that will be preempted by the anticipation point
+handler. Registering an anticipation entry will result in execution
+transfering to the associated \fIap_handler\fP when the program counter
+reaches the \fIap_addr\fP.
+
+The default behavior when returning from an \fIap_handler\fP is to
+unregister the entry and resume execution at the \fIap_addr\fP. The
+return behavior may be modified by returning using \fIap_sret\fP.
+The \fIap_sret\fP call sets the return address of a \fIap_handler\fP to
+\fIr_addr\fP. Note, the stack contents and stack pointer will be
+restored to the values present when execution was anticipated at
+\fIap_addr\fP. 
+
+An entry is uniquely identified by the pair of \fIap_addr\fP and
+\fIap_handler\fP. To register or unregister both must be provided, passing
+a \fINULL\fP value for \fIap_handler\fP will result in undefined
+behavior. Multiple handlers may be registered to the same address, 
+the order in which they are executed when triggered is
+non-deterministic. Subsequent registrations of an entry is equivalent
+to replacing the already registered entry, which may be desireable to
+change the flags on an entry.
+
+.SH FLAGS
+
+\fIap_flags\fP modifies the behavior of a registered entry. It is
+formed by the bitwise OR of zero or more of the following:
+
+.B AP_DISABLE
+If
+.I ap_flags
+is
+.BR AP_DISABLE
+then the entry is disabled and will not be anticipated.
+
+.B AP_ONESHOT
+If
+.I ap_flags
+is
+.BR AP_ONESHOT
+then the entry will be unregistered before entering the
+\fIap_handler\fP.
+
 .SH RETURN VALUE
-On success,
-\fBapregister\fR()
-and
-\fBapunregister\fR()
-return 0.
+On success, \fBap_reg\fR() and \fBap_ureg\fR() return 0.
 On error, \-1 is returned 
+.SH ERRORS
+On error, these functions set errno to indicate the cause of the failure. Possible error values include:
+
+.TP
+.B EINVAL
+ap_flags contains bits other than AP_DISABLE or AP_ONESHOT (or their valid combinations), or ap_addr or r_addr is not a valid instruction address
+.TP
+.B ENOMEM
+No hardware breakpoints left to register the anticipation point entry.
+.TP
+.B EPERM
+ap_sret is called outside of an anticipation point handler (i.e., not in the context of a triggered ap_handler)
